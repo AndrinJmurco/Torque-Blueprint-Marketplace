@@ -1,0 +1,376 @@
+spec_version: 2
+description: Blueprint for Certification Lab DatAdvantage Advanced Installation for Network Attached Storage (NAS) and Linux Platform Training
+previous_name: Certification_Lab_DatAdvantage_Advanced_Installation_for_NAS_and_Linux_Platform_Trai.yaml
+# blueprint inputs can be provided by the user, API or CI plugin when creating an environment from this blueprint.
+inputs:
+  azure_region:
+    type: string
+    description: "Select the Azure region to deploy your LAB to."
+    allowed-values: ["East US", "North Europe"]
+  NetApp:
+    type: string
+    description: "Select whether to have NetApp in the environment"
+    allowed-values: ["yes", "no"]
+    default: "no"
+# blueprint outputs define which data that was generated during environment provisioning will be returned to the user, API or CI.
+outputs:
+  dc_connection_link:
+    value: '{{ .grains.dc_virtual_machine.outputs.vm_connection_link }}'
+    kind: link
+  collector_connection_link:
+    value: '{{ .grains.collector_virtual_machine.outputs.vm_connection_link }}'
+    kind: link
+  dsp_connection_link:
+    value: '{{ .grains.dsp_virtual_machine.outputs.vm_connection_link }}'
+    kind: link
+  filer_connection_link:
+    value: '{{ .grains.filer_virtual_machine.outputs.vm_connection_link }}'
+    kind: link
+  solr_connection_link:
+    value: '{{ .grains.solr_virtual_machine.outputs.vm_connection_link }}'
+    kind: link
+  ubuntu_connection_link:
+    value: '{{ .grains.ubuntu_virtual_machine.outputs.vm_connection_link }}'
+    kind: link
+  netapp_nic_cluster_config:
+    value: '{{ .grains.netapp.outputs.netapp_nic_cluster_config }}'
+    kind: string
+  netapp_nic_cifs_config:
+    value: '{{ .grains.netapp.outputs.netapp_nic_cifs_config }}'
+    kind: string
+  Lab Username:
+    value: 'vrnslab\itadmin'
+    kind: string
+  Lab Password:
+    value: 'p@ssword1'
+    kind: string  
+  "Lab Resource Group Name":
+    value: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'  
+    kind: string  
+grains:
+  network_infrastructure:
+    kind: terraform
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/network_infrastructure
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - azure_region: '{{ .inputs.azure_region }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - labs_vnet_name_eastus2: '{{ .params.labs_vnet_name_eastus2 }}'
+      - labs_vnet_name_northeurope: '{{ .params.labs_vnet_name_northeurope }}'
+      - labs_vnet_ignored_subnet_cidrs_eastus2: '{{ .params.labs_vnet_ignored_subnet_cidrs_eastus2 }}'
+      - labs_vnet_ignored_subnet_cidrs_northeurope: '{{ .params.labs_vnet_ignored_subnet_cidrs_northeurope }}'
+      - labs_rt_eastus2: '{{ .params.labs_rt_eastus2 }}'
+      - labs_rt_northeurope: '{{ .params.labs_rt_northeurope }}'
+      - qualix_subnet_eastus2: '{{ .params.qualix_subnet_eastus2 }}'
+      - qualix_subnet_northeurope: '{{ .params.qualix_subnet_northeurope }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - vnet_subnet_cidr: 27
+      env-vars: []
+      outputs:
+      - lab_id
+      - lab_rg_name
+      - lab_subnet_name
+      - lab_vnet_name
+      - labs_vnet_cidr
+      - lab_nsg_id
+      - lab_nsg_name
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  dc_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'dc'
+      - vm_size: 'Standard_D1_v2'
+      - vm_source_disk: 'template_2023071313550524_dc'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'
+      # - vm_username: '{{ .params.User_Name }}'
+      # - vm_password: '{{ .params.RDP_Password }}'
+      - vm_domain: '{{ .params.vm_domain }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - boot_sequence: '1'
+      - is_domain_controller: true 
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  collector_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure,dc_virtual_machine
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'collector'
+      - vm_size: 'Standard_D3_v2'
+      - vm_source_disk: 'template_2023071313550524_collector'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'
+      # - vm_username: '{{ .params.User_Name }}'
+      # - vm_password: '{{ .params.RDP_Password }}'
+      - vm_domain: '{{ .params.vm_domain }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - custom_dns_server_ip: '{{ .grains.dc_virtual_machine.outputs.vm_private_ip }}'
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  dsp_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure,dc_virtual_machine
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'dsp'
+      - vm_size: 'Standard_D3_v2'
+      - vm_source_disk: 'template_2023071313550524_dsp'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'
+      # - vm_username: '{{ .params.User_Name }}'
+      # - vm_password: '{{ .params.RDP_Password }}'
+      - vm_domain: '{{ .params.vm_domain }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - custom_dns_server_ip: '{{ .grains.dc_virtual_machine.outputs.vm_private_ip }}'
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  filer_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure,dc_virtual_machine
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'filer'
+      - vm_size: 'Standard_D2_v2'
+      - vm_source_disk: 'template_2023071313550524_filer'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'
+      # - vm_username: '{{ .params.User_Name }}'
+      # - vm_password: '{{ .params.RDP_Password }}'
+      - vm_domain: '{{ .params.vm_domain }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - custom_dns_server_ip: '{{ .grains.dc_virtual_machine.outputs.vm_private_ip }}'
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  solr_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure,dc_virtual_machine
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'solr'
+      - vm_size: 'Standard_D2_v2'
+      - vm_source_disk: 'template_2023071313550524_solr'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'
+      # - vm_username: '{{ .params.User_Name }}'
+      # - vm_password: '{{ .params.RDP_Password }}'
+      - vm_domain: '{{ .params.vm_domain }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - custom_dns_server_ip: '{{ .grains.dc_virtual_machine.outputs.vm_private_ip }}'
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  ubuntu_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure,dc_virtual_machine,collector_virtual_machine,dsp_virtual_machine,filer_virtual_machine,solr_virtual_machine
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'ubuntu-14.4'
+      - vm_size: 'Standard_B2ms'
+      - vm_source_disk: 'template_2023071313550524_ubuntu_14.4'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'
+      - vm_username: '{{ .params.ubuntu_vm_username }}'
+      - vm_password: '{{ .params.ubuntu_vm_password }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - custom_dns_server_ip: '{{ .grains.dc_virtual_machine.outputs.vm_private_ip }}'
+      - vm_source_disk_os_type: 'ubuntu'
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  netapp:
+    kind: terraform
+    depends-on: network_infrastructure,dc_virtual_machine,collector_virtual_machine,dsp_virtual_machine,filer_virtual_machine,solr_virtual_machine,ubuntu_virtual_machine
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: netapp-cloudmanager/netapp-cloudmanager_cvo_azure
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - azure_region: '{{ .inputs.azure_region }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - labs_vnet_cidr: '{{ .grains.network_infrastructure.outputs.labs_vnet_cidr }}'
+      - lab_nsg_id: '{{ .grains.network_infrastructure.outputs.lab_nsg_id }}'
+      - netapp_occm_clientid: '{{ .params.netapp_occm_clientid }}'
+      - netapp_occm_clientsecret: '{{ .params.netapp_occm_clientsecret }}'
+      - netapp_occm_connectorid: '{{ .params.netapp_occm_connectorid }}'
+      - netapp_occm_workspaceid: '{{ .params.netapp_occm_workspaceid }}'
+      - netapp_occm_providerid: '{{ .params.netapp_occm_providerid }}'
+      - netapp_occm_svm_password: 'P@ssword1'
+      - netapp_ontap_version: 'ONTAP-9.12.1.T1.azure' # comment out when it's unnecessary when netapp_is_use_latest_version = true
+      - netapp_instance_type: 'Standard_E4s_v3'
+      - netapp_license_type: 'capacity-paygo'
+      - netapp_capacity_package_name: 'Freemium'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - occm_subnet: '{{ .params.occm_subnet }}'
+      - lab_nsg_name: '{{ .grains.network_infrastructure.outputs.lab_nsg_name}}'
+      - is_run_netapp: '{{ .inputs.NetApp }}'
+      - netapp_is_use_latest_version: false
+      # - labs_vnet_name_eastus2: 'VaronisDemoEastUS2' # might not need this; should be able to use lab_vnet_name and just specify it as a var in the TF
+      # - labs_vnet_name_northeurope: 'VaronisDemoNorthEurope' # might not need this; should be able to use lab_vnet_name and just specify it as a var in the TF
+      env-vars: []
+      outputs:
+      - netapp_nic_cluster_config
+      - netapp_nic_cifs_config
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6

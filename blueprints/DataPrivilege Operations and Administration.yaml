@@ -1,0 +1,180 @@
+spec_version: 2
+description: v1 April 2022 - v8.6.22
+previous_name: Certification Lab-DataPrivilege_Operations_and_Administration.yaml
+# blueprint inputs can be provided by the user, API or CI plugin when creating an environment from this blueprint.
+inputs:
+  azure_region:
+    type: string
+    description: "Select the Azure region to deploy your LAB to."
+    allowed-values: ["East US", "North Europe"]
+# blueprint outputs define which data that was generated during environment provisioning will be returned to the user, API or CI.
+outputs:
+  dc_connection_link:
+    value: '{{ .grains.dc_virtual_machine.outputs.vm_connection_link }}'
+    kind: link  
+  dsp_connection_link:
+    value: '{{ .grains.dsp_virtual_machine.outputs.vm_connection_link }}'
+    kind: link
+  exchange_connection_link:
+    value: '{{ .grains.exchange_virtual_machine.outputs.vm_connection_link }}'
+    kind: link
+  Lab Username:
+    value: 'vrnslab\itadmin'
+    kind: string
+  Lab Password:
+    value: 'p@ssword1'
+    kind: string   
+  "Lab Resource Group Name":
+    value: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'  
+    kind: string
+grains:
+  network_infrastructure:
+    kind: terraform
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/network_infrastructure
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - azure_region: '{{ .inputs.azure_region }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - labs_vnet_name_eastus2: '{{ .params.labs_vnet_name_eastus2 }}'
+      - labs_vnet_name_northeurope: '{{ .params.labs_vnet_name_northeurope }}'
+      - labs_vnet_ignored_subnet_cidrs_eastus2: '{{ .params.labs_vnet_ignored_subnet_cidrs_eastus2 }}'
+      - labs_vnet_ignored_subnet_cidrs_northeurope: '{{ .params.labs_vnet_ignored_subnet_cidrs_northeurope }}'
+      - labs_rt_eastus2: '{{ .params.labs_rt_eastus2 }}'
+      - labs_rt_northeurope: '{{ .params.labs_rt_northeurope }}'
+      - qualix_subnet_eastus2: '{{ .params.qualix_subnet_eastus2 }}'
+      - qualix_subnet_northeurope: '{{ .params.qualix_subnet_northeurope }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      env-vars: []
+      outputs:
+      - lab_id
+      - lab_rg_name
+      - lab_subnet_name
+      - lab_vnet_name
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  dc_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'dc'
+      - vm_size: 'Standard_D1_v2'
+      - vm_source_disk: 'template_2023071314510522_dc'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'
+      - vm_username: '{{ .params.windows_vm_username }}'
+      - vm_password: '{{ .params.windows_vm_password }}'
+      - vm_domain: '{{ .params.vm_domain }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      - rdp_security_type: 'any'
+      - boot_sequence: '1'
+      - is_domain_controller: true 
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  dsp_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure,dc_virtual_machine
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'dsp'
+      - vm_size: 'Standard_B2ms'
+      - vm_source_disk: 'template_2023071314510522_dsp'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'     
+      - vm_domain: '{{ .params.vm_domain }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
+  exchange_virtual_machine:
+    kind: terraform
+    depends-on: network_infrastructure,dc_virtual_machine
+    spec:
+      source:
+        store: IT-BA-LAB-Torque-TF-Modules
+        path: azurerm/virtual_machine
+        branch: features/sharedResourceDisks
+      scripts:
+        pre-tf-init:
+          source:
+            store: IT-BA-LAB-Torque-TF-Modules
+            path: terraformrc-script/script.sh          
+      agent:
+        name: '{{ .params.agent_name }}'
+      inputs:
+      - environment_name: '{{ environmentName }}'
+      - lab_id: '{{ .grains.network_infrastructure.outputs.lab_id }}'
+      - lab_rg_name: '{{ .grains.network_infrastructure.outputs.lab_rg_name }}'
+      - lab_subnet_name: '{{ .grains.network_infrastructure.outputs.lab_subnet_name }}'
+      - lab_vnet_name: '{{ .grains.network_infrastructure.outputs.lab_vnet_name }}'
+      - labs_vnet_rg: '{{ .params.labs_vnet_rg }}'
+      - qualix_fqdn_us: '{{ .params.qualix_fqdn_us }}'
+      - qualix_fqdn_neu: '{{ .params.qualix_fqdn_neu }}'
+      - vm_name: 'exchange'
+      - vm_size: 'Standard_B2ms'
+      - vm_source_disk: 'template_2023071314510522_exchange'
+      - vm_source_disk_rg_eastus2: '{{ .params.vm_source_disk_rg_eastus2 }}'
+      - vm_source_disk_rg_northeurope: '{{ .params.vm_source_disk_rg_northeurope }}'
+      - vm_domain: '{{ .params.vm_domain }}'
+      - resource_Suffix: '{{ .params.Resource_Suffix }}'
+      env-vars: []
+      outputs:
+      - vm_private_ip
+      - vm_connection_link
+    # The terraform version that will be used to deploy the module
+    tf-version: 1.3.6
